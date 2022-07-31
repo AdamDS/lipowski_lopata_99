@@ -163,6 +163,9 @@ class ll_99(object):
         return None
 
 
+    # ============
+    # Steady State 
+    # ============
     def steady_state_simulation(self):
         self.randomize()  # initialize lattice
         extinct_species = np.zeros((self.max_epochs,), dtype=list)
@@ -182,12 +185,15 @@ class ll_99(object):
             extinct_species = self.steady_state_simulation()
             self.results[trial] = extinct_species.T
         
-        
-    def one_random_species(self):
+    
+    # ===========
+    # Single Seed
+    # ===========
+    def init_single_seed(self):
         # "w_i,i+1 = r0 for i = 3,4,...,L and 2r0 < r_c"
         certainly_active = 2*self.dimension
         self.randomize()  # initiales every site
-        self.interactions = np.ndarray(self.shape, dtype=dict)
+        #self.interactions = np.ndarray(self.shape, dtype=dict)
         _ = np.ravel(self.interactions)
         for site in _:
             site['w_ij'] = np.zeros((self.dimension, 2), dtype=float)
@@ -196,21 +202,28 @@ class ll_99(object):
         for d in np.arange(0, self.dimension):
             # left neighbor
             _[0]['w_ij'] = np.zeros((self.dimension, 2), dtype=float)
-            _[0]['w_ij'][d][1] = certainly_absorbed
+            _[0]['w_ij'][d][1] = certainly_active  # seed to right
             
             # right neighbor
             _[2]['w_ij'] = np.zeros((self.dimension, 2), dtype=float)
-            _[2]['w_ij'][d][0] = certainly_absorbed
-        _[0]['omega'] = np.sum()
+            _[2]['w_ij'][d][0] = certainly_active  # seed to left
+        _[0]['omega'] = np.sum(_[0]['w_ij'])
+        _[2]['omega'] = np.sum(_[2]['w_ij'])
         self.interactions = _.reshape(self.shape)
+        the_seed = tuple([1 for _ in np.arange(0, self.dimension)])
+        return the_seed        
         
         
     def single_seed_simulation(self):
-        self.one_random_species()  # initialize lattice
+        the_species = self.init_single_seed()  # initialize lattice
         time_to_absorb = self.max_epochs
         for t in np.arange(0, self.max_epochs):
             # measure epochs for single active site to absorb
             extinct_species = self.epoch()
+            if extinct_species == the_species:
+                if self.interaction[the_species]['omega'] > r:
+                    time_to_absorb = t
+                    break
             #if extinct_species is not None:  # must be active site
                 #if self.interaction[]
         return time_to_absorb
@@ -232,10 +245,13 @@ class ll_99(object):
         
         self.results = np.zeros((self.n_trials, self.max_epochs), dtype=list)
         for trial in np.arange(0, self.n_trials):
-            extinct_species = self.single_seed_simulation()
-            self.results[trial] = extinct_species.T
+            times_to_absorb = self.single_seed_simulation()
+            self.results[trial] = times_to_absorb
         
-        
+    
+    # ========
+    # Analysis
+    # ========
     def study(self):
         self.probability_survival = np.sum(np.array([[0 if x is None else 1 \
             for x in exp.results[i]] for i in range(0, 10)]), axis=0)
