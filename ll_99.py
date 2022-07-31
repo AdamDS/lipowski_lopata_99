@@ -43,73 +43,125 @@ class ll_99(object):
 
     # random w_i,j
     def randomize(self):
-        self.interactions = np.zeros(self.shape)
+        '''
+        The authors indicate that each species experiences frustration 
+        from neighboring species. And it's the interactions that are 
+        reset when replacing a species. There's no indication that when 
+        a species is extinct and replaced that it affects the interactions 
+        expected from the neighboring species perspective. w_i,j is the 
+        interaction of j with i; does w_i,j == w_j,i? Must w_i,j == w_i+1,j?
+        I think the data structure should be different. The interactions 
+        should be a dict of species with interactions for each dimension. 
+        The interactions of each dimension should define the 
+        'left' and 'right' interactions.
+        '''
+        # self.interactions = np.zeros(self.shape)
+        # _ = np.ravel(self.interactions)
+        # for i in np.arange(0, len(_)):
+        #     _[i] = self.rng.random()
+        # self.interactions = _.reshape(self.shape)
+        self.interactions = np.ndarray(self.shape, dtype=dict)
         _ = np.ravel(self.interactions)
-        for i in np.arange(0, len(_)):
-            _[i] = self.rng.random()
+        for i in np.arange(0, np.prod(self.shape)):
+            self.randomize_species_ravel(_, i)
         self.interactions = _.reshape(self.shape)
 
 
-    def random_species(self):
-        site = [int(self.length*self.rng.random()) \
-            for _ in np.arange(0, self.dimension)]
-        return site
+    def randomize_species_ravel(self, _, i):
+        _[i]['w_ij'] = np.zeros((self.dimension, 2), dtype=float)
+        for d in np.arange(0, self.dimension):
+            _[i]['w_ij'][d] = self.random_dim_interaction()
+        _[i]['omega'] = np.sum(_[i]['w_ij'])
+        
+        
+    def random_dim_interactions(self):
+        return [self.rng.random(), self.rng.random()]
+        
+        
+    def randomize_species(self, lattice_site):
+        species = self.interactions[lattice_site]
+        for d in np.arange(0, self.dimension):
+            species['w_ij'][d] = self.random_dim_interactions()
+        species['omega'] = np.sum(species['w_ij'])
 
 
-    def neighbor_interaction(self, site, i, left_right):
-        # frustration from "left_right" neighbors
-        _neighbor = copy.deepcopy(site)
-        _neighbor[i] = site[i] + left_right
-        if _neighbor[i] < 0:  # periodic boundaries
-            _neighbor[i] = self.length - 1
-        elif _neighbor[i] >= self.length:
-            _neighbor[i] = 0
+    def get_a_random_species(self):
+        site = tuple([int(self.length*self.rng.random()) \
+            for _ in np.arange(0, self.dimension)])
+        ravel_site = site + [i*self.length \
+            for i in np.arange(0, self.dimension)]
+        
+        return (site, ravel_site)
 
-        interaction = self.interactions[tuple(_neighbor)]
 
-        return interaction
+    def neighbor_interaction(self, lattice_site, d):
+        this_dim_interaction = 0
+        this_dim_interaction = np.sum(self.interactions[lattice_site][d])
+
+        return this_dim_interaction
 
 
     # calculate species frustration omega_j
-    def species_interact(self, site):
+    def species_interact(self, lattice_site):
         '''
         site is a tuple indicating site of interest (i,j of w_i,j)
         frustration is the sum of neighbor interactions (omega_j)
         '''
-        frustration = 0
-        for i in np.arange(0, self.dimension):
-            # frustration from "left" neighbors
-            frustration += self.neighbor_interaction(site, i, -1)
-            # frustration from "right" neighbors
-            frustration += self.neighbor_interaction(site, i, +1)
-
+        frustration = self.interaction[lattice_site]['omega']
+        
         return frustration
 
 
-    def replace_extinct_species(self, random_species):
-        if len(random_species):
-            self.interactions[random_species] = self.rng.random()
+    def periodic_boundaries(self, site):
+        if site < 0:  # off left
+            site = self.length - 1
+        elif site >= self.length:  # off right
+            site = 0
+        # implicit else, not at boundary
+        
+        return site
+        
+        
+    def replace_extinct_species(self, lattice_site, ravel_site):
+#        if len(random_species):
+#            self.interactions[random_species] = self.rng.random()
+        self.randomize_species(lattice_site)
 
+        for d in np.arange(0, self.dimension):
+            left_neighbor = copy.deepcopy(lattice_site)
+            right_neighbor = copy.deepcopy(lattice_site)
+            # left neighbor
+            left_neighbor[d] = self.periodic_boundaries(left_neighbor[d] - 1)
+            self.update_neighbor(left_neighbor, d, 1)
+            # right neighbor
+            right_neighbor[d] = self.periodic_boundaries(right_neighbor[d] + 1)
+            self.update_neighbor(right_neighbor, d, 0)
 
-    def random_species_extinction(self, random_site, frustration):
+            
+    def update_neighbor(self, neighbor_site, d, left_right):
+        neighbor_species = self.interactions[neighbor_site]
+        neighbor_species['w_ij'][d][left_right] = self.rng.random()
+    
+
+    def random_species_extinction(self, lattice_site, ravel_site, frustration):
         if frustration > self.r:
-            self.replace_extinct_species(random_site)
+            self.replace_extinct_species(lattice_site, ravel_site)
             return True
         return False
 
 
     def epoch(self):
         # "Choose a site i at random"
-        a_species = self.random_species()
+        (lattice_site, ravel_site) = self.get_a_random_species()
         # "Calculate sum_j(w_i,j), where summation is over all 
         #    nearest neighbors j"
-        frustration = self.species_interact(a_species)
+        frustration = self.species_interact(lattice_site)
         # "If omega < r, then the chosen species, due to too 
         #    much frustration, becomes extinct and the site 
         #    becomes occupied by a new species with the 
         #    interactions w_i,j chosen anew. If omega > r, 
         #    the species at the site i survives"
-        went_extinct = self.random_species_extinction(a_species, frustration)
+        went_extinct = self.random_species_extinction(lattice_site, frustration)
         
         if went_extinct:
             return a_species
@@ -137,12 +189,18 @@ class ll_99(object):
         
         
     def one_random_species(self):
-        # "w_i,i+1 = r0 for i = 3,4,...,L and 2r0 < r_"
-        self.interactions = np.zeros(self.shape) + self.r
+        # "w_i,i+1 = r0 for i = 3,4,...,L and 2r0 < r_c"
+        certainly_absorbed = 2*self.dimension
+        self.interactions = np.zeros(self.shape) + certainly_absorbed
         _ = np.ravel(self.interactions)
         # "assign w_1,2 = w_2,3 = 0.23"
-        _[0] = 0.23
-        _[2] = 0.23
+        for d in np.arange(0, self.dimension):
+            # left neighbor
+            _[0]['w_ij'] = np.zeros((self.dimension, 2), dtype=float)
+            _[0]['w_ij'][d][1] = certainly_absorbed
+            # right neighbor
+            _[2]['w_ij'] = np.zeros((self.dimension, 2), dtype=float)
+            _[2]['w_ij'][d][0] = certainly_absorbed
         self.interactions = _.reshape(self.shape)
         
         
@@ -152,8 +210,8 @@ class ll_99(object):
         for t in np.arange(0, self.max_epochs):
             # measure epochs for single active site to absorb
             extinct_species = self.epoch()
-            if extinct_species is not None:  # must be active site
-                if self.interaction
+            #if extinct_species is not None:  # must be active site
+                #if self.interaction[]
         return time_to_absorb
 
 
