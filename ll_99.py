@@ -35,7 +35,6 @@ class ll_99(object):
         self.rng = np.random.default_rng(rng_seed)  # arg sets seed of RNG
         
         self.interactions = np.zeros(self.shape)
-        self.randomize()
         
         self.r_s = r_s
         self.r = self.r_s[0]
@@ -44,6 +43,7 @@ class ll_99(object):
 
     # random w_i,j
     def randomize(self):
+        self.interactions = np.zeros(self.shape)
         _ = np.ravel(self.interactions)
         for i in np.arange(0, len(_)):
             _[i] = self.rng.random()
@@ -92,7 +92,7 @@ class ll_99(object):
 
 
     def random_species_extinction(self, random_site, frustration):
-        if frustration < self.r:
+        if frustration > self.r:
             self.replace_extinct_species(random_site)
             return True
         return False
@@ -137,25 +137,40 @@ class ll_99(object):
         
         
     def one_random_species(self):
+        # "w_i,i+1 = r0 for i = 3,4,...,L and 2r0 < r_"
+        self.interactions = np.zeros(self.shape) + self.r
         _ = np.ravel(self.interactions)
-        _[0] = self.rng.random()
+        # "assign w_1,2 = w_2,3 = 0.23"
+        _[0] = 0.23
+        _[2] = 0.23
         self.interactions = _.reshape(self.shape)
         
         
     def single_seed_simulation(self):
         self.one_random_species()  # initialize lattice
-        extinct_species = np.zeros((self.max_epochs,), dtype=list)
+        time_to_absorb = self.max_epochs
         for t in np.arange(0, self.max_epochs):
-            extinct_species[t] = self.epoch()
-        return extinct_species
+            # measure epochs for single active site to absorb
+            extinct_species = self.epoch()
+            if extinct_species is not None:  # must be active site
+                if self.interaction
+        return time_to_absorb
 
 
     def single_seed(self):
         '''
-        "we studied the density p of active sites ~i.e., those with 
-        omega < r in the steady state for the system size L = 10^4 
-        and L = 10^5 and with initial interactions chosen randomly."
+        "a single active site and L-1 inactive sites. Thus we 
+        assign w_1,2 = w_2,3 = 0.23 and w_i,i+1 = r_0 for i = 3,4,...,L 
+        and 2r_0 < r_c. With such an assignment and for r close 
+        to r_c only the site with i = 2 is active. Since the 
+        periodic boundary conditions are imposed in our simulations, 
+        the system is translationally invariant and the initial 
+        location of the active site is obviously irrelevant.
+        
+        From the description, I assume they continue testing the 
+        1-D problem. w_1,2 is the site left of 
         '''
+        
         self.results = np.zeros((self.n_trials, self.max_epochs), dtype=list)
         for trial in np.arange(0, self.n_trials):
             extinct_species = self.steady_state_simulation()
