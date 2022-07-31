@@ -63,15 +63,17 @@ class ll_99(object):
         self.interactions = np.ndarray(self.shape, dtype=dict)
         _ = np.ravel(self.interactions)
         for i in np.arange(0, np.prod(self.shape)):
-            self.randomize_species_ravel(_, i)
+            _[i] = dict()
+            site = _[i]
+            self.randomize_species_ravel(site)
         self.interactions = _.reshape(self.shape)
 
 
-    def randomize_species_ravel(self, _, i):
-        _[i]['w_ij'] = np.zeros((self.dimension, 2), dtype=float)
+    def randomize_species_ravel(self, site):
+        site['w_ij'] = np.zeros((self.dimension, 2), dtype=float)
         for d in np.arange(0, self.dimension):
-            _[i]['w_ij'][d] = self.random_dim_interaction()
-        _[i]['omega'] = np.sum(_[i]['w_ij'])
+            site['w_ij'][d] = self.random_dim_interactions()
+        site['omega'] = np.sum(site['w_ij'])
         
         
     def random_dim_interactions(self):
@@ -86,12 +88,12 @@ class ll_99(object):
 
 
     def get_a_random_species(self):
-        site = tuple([int(self.length*self.rng.random()) \
-            for _ in np.arange(0, self.dimension)])
+        site = [int(self.length*self.rng.random()) \
+            for _ in np.arange(0, self.dimension)]
         ravel_site = site + [i*self.length \
             for i in np.arange(0, self.dimension)]
         
-        return (site, ravel_site)
+        return (tuple(site), ravel_site)
 
 
     def neighbor_interaction(self, lattice_site, d):
@@ -107,7 +109,7 @@ class ll_99(object):
         site is a tuple indicating site of interest (i,j of w_i,j)
         frustration is the sum of neighbor interactions (omega_j)
         '''
-        frustration = self.interaction[lattice_site]['omega']
+        frustration = self.interactions[lattice_site]['omega']
         
         return frustration
 
@@ -122,20 +124,20 @@ class ll_99(object):
         return site
         
         
-    def replace_extinct_species(self, lattice_site, ravel_site):
+    def replace_extinct_species(self, lattice_site):
 #        if len(random_species):
 #            self.interactions[random_species] = self.rng.random()
         self.randomize_species(lattice_site)
 
         for d in np.arange(0, self.dimension):
-            left_neighbor = copy.deepcopy(lattice_site)
-            right_neighbor = copy.deepcopy(lattice_site)
+            left_neighbor = list(copy.deepcopy(lattice_site))
+            right_neighbor = list(copy.deepcopy(lattice_site))
             # left neighbor
             left_neighbor[d] = self.periodic_boundaries(left_neighbor[d] - 1)
-            self.update_neighbor(left_neighbor, d, 1)
+            self.update_neighbor(tuple(left_neighbor), d, 1)
             # right neighbor
             right_neighbor[d] = self.periodic_boundaries(right_neighbor[d] + 1)
-            self.update_neighbor(right_neighbor, d, 0)
+            self.update_neighbor(tuple(right_neighbor), d, 0)
 
             
     def update_neighbor(self, neighbor_site, d, left_right):
@@ -143,9 +145,9 @@ class ll_99(object):
         neighbor_species['w_ij'][d][left_right] = self.rng.random()
     
 
-    def random_species_extinction(self, lattice_site, ravel_site, frustration):
+    def random_species_extinction(self, lattice_site, frustration):
         if frustration > self.r:
-            self.replace_extinct_species(lattice_site, ravel_site)
+            self.replace_extinct_species(lattice_site)
             return True
         return False
 
@@ -164,7 +166,7 @@ class ll_99(object):
         went_extinct = self.random_species_extinction(lattice_site, frustration)
         
         if went_extinct:
-            return a_species
+            return lattice_site
         return None
 
 
@@ -190,9 +192,12 @@ class ll_99(object):
         
     def one_random_species(self):
         # "w_i,i+1 = r0 for i = 3,4,...,L and 2r0 < r_c"
-        certainly_absorbed = 2*self.dimension
-        self.interactions = np.zeros(self.shape) + certainly_absorbed
+        certainly_active = 2*self.dimension
+        self.interactions = np.ndarray(self.shape, dtype=dict)
         _ = np.ravel(self.interactions)
+        for site in _:
+            _['w_ij'] = np.zeros((self.dimension, 2), dtype=float)
+            _['omega'] = 0
         # "assign w_1,2 = w_2,3 = 0.23"
         for d in np.arange(0, self.dimension):
             # left neighbor
