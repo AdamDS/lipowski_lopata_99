@@ -116,7 +116,7 @@ class ll_99(object):
         return None
 
 
-    def simulation(self):
+    def steady_state_simulation(self):
         self.randomize()  # initialize lattice
         extinct_species = np.zeros((self.max_epochs,), dtype=list)
         for t in np.arange(0, self.max_epochs):
@@ -125,9 +125,40 @@ class ll_99(object):
 
 
     def steady_state(self):
+        '''
+        "we studied the density p of active sites ~i.e., those with 
+        omega < r in the steady state for the system size L = 10^4 
+        and L = 10^5 and with initial interactions chosen randomly."
+        '''
         self.results = np.zeros((self.n_trials, self.max_epochs), dtype=list)
         for trial in np.arange(0, self.n_trials):
-            extinct_species = self.simulation()
+            extinct_species = self.steady_state_simulation()
+            self.results[trial] = extinct_species.T
+        
+        
+    def one_random_species(self):
+        _ = np.ravel(self.interactions)
+        _[0] = self.rng.random()
+        self.interactions = _.reshape(self.shape)
+        
+        
+    def single_seed_simulation(self):
+        self.one_random_species()  # initialize lattice
+        extinct_species = np.zeros((self.max_epochs,), dtype=list)
+        for t in np.arange(0, self.max_epochs):
+            extinct_species[t] = self.epoch()
+        return extinct_species
+
+
+    def single_seed(self):
+        '''
+        "we studied the density p of active sites ~i.e., those with 
+        omega < r in the steady state for the system size L = 10^4 
+        and L = 10^5 and with initial interactions chosen randomly."
+        '''
+        self.results = np.zeros((self.n_trials, self.max_epochs), dtype=list)
+        for trial in np.arange(0, self.n_trials):
+            extinct_species = self.steady_state_simulation()
             self.results[trial] = extinct_species.T
         
         
@@ -137,17 +168,25 @@ class ll_99(object):
 
         
 #def main():
-#    length = 1000
-#    dimension = 1  # To examine the properties of the one-dimensional version of this model, we used Monte Carlo simulations
+#    # "for the system size L = 10^4 and L = 10^5"
+#    length = 10000
+
+#    # "To examine the properties of the one-dimensional version 
+#    #    of this model, we used Monte Carlo simulations"
+#    dimension = 1  
+
+#    # "Our statistics is based on runs up to t = 2x10^4"
 #    T = 20000
-#    r_s = [0.44, 0.4405, 0.441, 0.4415]
+#    # "we usually made 2x10^4 independent runs"
 #    n_trials = 20000
+
+#    # clearly indicate the existence of the phase transition 
+#    #    in the present model around r~0.44, which separates 
+#    #    the active (p > 0) and the absorbing (p = 0) phases
+#    r_s = [0.44, 0.4405, 0.441, 0.4415]  
 
 #    experiment = ll_99(n_trials, T, L, d, r_s, rng_seed=None)
 
-# we studied the density p of active sites ~i.e., those with 
-#    omega < r in the steady state for the system size L = 10^4 
-#    and L = 10^5 and with initial interactions chosen randomly.
 #    experiment.steady_state()
 
 # sys.exit(main())
