@@ -39,10 +39,16 @@ class ll_99(object):
         self.r_s = r_s
         self.r = self.r_s[0]
         
-        self.extinct_species = None
+        self.active_species = None
+        self.init_active_species()
 
+        
+    def init_active_species(self):
+        self.active_species = np.zeros((self.max_epochs,), dtype=int)
+        
+        
     # random w_i,j
-    def randomize(self):
+    def init_interactions(self):
         '''
         The authors indicate that each species experiences frustration 
         from neighboring species. And it's the interactions that are 
@@ -60,12 +66,16 @@ class ll_99(object):
         # for i in np.arange(0, len(_)):
         #     _[i] = self.rng.random()
         # self.interactions = _.reshape(self.shape)
+        self.init_active_species()
         self.interactions = np.ndarray(self.shape, dtype=dict)
         _ = np.ravel(self.interactions)
         for i in np.arange(0, np.prod(self.shape)):
             _[i] = dict()
             site = _[i]
             self.randomize_species_ravel(site)
+            starts_active = self.is_active(site)
+            if starts_active:
+                self.active_species[0] += 1
         self.interactions = _.reshape(self.shape)
 
 
@@ -79,6 +89,13 @@ class ll_99(object):
     def random_dim_interactions(self):
         return [self.rng.random(), self.rng.random()]
         
+        
+    def is_active(self, site):
+        # "active sites (i.e., those with omega > r)"
+        if site['omega'] > self.r:
+            return True
+        return False
+
         
     def randomize_species(self, lattice_site):
         species = self.interactions[lattice_site]
@@ -141,8 +158,6 @@ class ll_99(object):
     def random_species_extinction(self, lattice_site, frustration):
         if frustration > self.r:
             self.replace_extinct_species(lattice_site)
-            return True
-        return False
     
 
     def epoch(self):
@@ -156,22 +171,24 @@ class ll_99(object):
         #    becomes occupied by a new species with the 
         #    interactions w_i,j chosen anew. If omega > r, 
         #    the species at the site i survives"
-        went_extinct = self.random_species_extinction(lattice_site, frustration)
+        self.random_species_extinction(lattice_site, frustration)
         
-        if went_extinct:
-            return lattice_site
-        return None
+        species_activity = self.is_active(self.interactions[lattice_site])
+        
+        return species_activity
 
 
     # ============
     # Steady State 
     # ============
     def steady_state_simulation(self):
-        self.randomize()  # initialize lattice
-        extinct_species = np.zeros((self.max_epochs,), dtype=list)
+        self.init_interactions()  # initialize lattice
+        total_active = self.active_species[0]
         for t in np.arange(0, self.max_epochs):
-            extinct_species[t] = self.epoch()
-        return extinct_species
+            species_activity = self.epoch()
+            if species_activity:
+                total_active += 1
+            self.active_species[t] = total_active
 
 
     def steady_state(self):
@@ -182,8 +199,8 @@ class ll_99(object):
         '''
         self.results = np.zeros((self.n_trials, self.max_epochs), dtype=list)
         for trial in np.arange(0, self.n_trials):
-            extinct_species = self.steady_state_simulation()
-            self.results[trial] = extinct_species.T
+            self.steady_state_simulation()
+            self.results[trial] = self.active_species.T
         
     
     # ===========
@@ -198,7 +215,7 @@ class ll_99(object):
     def init_single_seed(self):
         # "w_i,i+1 = r0 for i = 3,4,...,L and 2r0 < r_c"
         certainly_absorbed = 2*self.dimension
-        self.randomize()  # initiales every site
+        self.init_interactions()  # initiales every site
         #self.interactions = np.ndarray(self.shape, dtype=dict)
         _ = np.ravel(self.interactions)
         for site in _:
@@ -232,8 +249,7 @@ class ll_99(object):
                 if self.interactions[the_species]['omega'] > self.r:
                     time_to_absorb = t
                     break
-            #if extinct_species is not None:  # must be active site
-                #if self.interaction[]
+                    
         return time_to_absorb
 
 
